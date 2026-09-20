@@ -13,7 +13,7 @@
 
 ## 📋 Project Overview
 
-EcoPulse AI is a machine learning system that predicts residential appliance energy consumption and detects anomalous consumption patterns in real-time. It combines traditional ML regression models with Google Gemini AI to generate human-readable explanations and actionable energy-saving recommendations.
+EcoPulse AI is a machine learning system for historical energy consumption analysis, appliance energy prediction, and anomaly detection. It combines traditional Scikit-learn regression models with Google Gemini AI to generate human-readable explanations and actionable energy-saving recommendations.
 
 Built for a sustainability-focused AI internship, this project demonstrates practical AI/ML engineering applied to a real-world environmental problem.
 
@@ -25,7 +25,7 @@ Built for a sustainability-focused AI internship, this project demonstrates prac
 
 - Buildings account for **~40% of global energy consumption** and **~36% of CO₂ emissions** (IEA, 2023).
 - Residential appliances are a major contributor to household energy bills and carbon footprints.
-- Most households lack real-time visibility into **unusual** energy consumption patterns.
+- Most households lack automated visibility into **unusual** energy consumption patterns.
 - Undetected anomalies (e.g., appliances left on unnecessarily, HVAC inefficiency) lead to wasted energy and avoidable emissions.
 
 ### Solution
@@ -64,19 +64,19 @@ EcoPulse AI addresses this by:
 | Location | Low-energy house, Stambruges, Belgium |
 | Target | `Appliances` — energy consumption (Wh) |
 
-### Key Features
+### Features (31 Model Input Features)
 
-| Feature | Description |
-|---------|-------------|
-| `T1`–`T9` | Indoor temperature per room (°C) |
-| `RH_1`–`RH_9` | Indoor relative humidity per room (%) |
-| `T_out` | Outdoor temperature (°C) |
-| `RH_out` | Outdoor humidity (%) |
-| `Windspeed` | Wind speed (m/s) |
-| `Visibility` | Visibility (km) |
-| `Tdewpoint` | Dew point temperature (°C) |
-| `lights` | Energy from lights (Wh) |
-| `date` | Timestamp → `hour`, `day`, `day_of_week`, `month`, `is_weekend` |
+The model trains on **31 continuous and temporal features** (excluding the target `Appliances` and raw `date`):
+
+| Category | Features | Count | Description |
+|----------|----------|:-----:|-------------|
+| **Lighting** | `lights` | 1 | Light fixtures energy consumption in the house (Wh) |
+| **Indoor Temperatures** | `T1`–`T9` | 9 | Temperatures (°C): kitchen (`T1`), living room (`T2`), laundry (`T3`), office (`T4`), bathroom (`T5`), outside north facade (`T6`), ironing room (`T7`), teenager room (`T8`), parents room (`T9`) |
+| **Indoor Humidity** | `RH_1`–`RH_9` | 9 | Relative humidity (%) measured across the 9 respective household zones |
+| **Weather Station** | `T_out`, `Press_mm_hg`, `RH_out`, `Windspeed`, `Visibility`, `Tdewpoint` | 6 | External meteorological variables from Chièvres weather station: outdoor temperature (°C), barometric pressure (mm Hg), outdoor humidity (%), wind speed (m/s), visibility (km), dew point temperature (°C) |
+| **Engineered Datetime** | `hour`, `day`, `day_of_week`, `month`, `year`, `is_weekend` | 6 | Derived from `date`: hour of day (0–23), day of month (1–31), day of week (0=Mon…6=Sun), month (1–12), year, and weekend binary flag (1=weekend, 0=weekday) |
+| **Target Variable** | `Appliances` | 1 | Appliance energy consumption (Wh) — *predicted variable (y), excluded from feature matrix (X)* |
+| **Excluded Noise** | `rv1`, `rv2` | 2 | Random dummy variables from original dataset — *dropped during preprocessing* |
 
 ---
 
@@ -139,50 +139,85 @@ RMSE is preferred over MAE because it penalises large errors more heavily — im
 
 ## 🚨 Anomaly Detection
 
-### Methodology
+### Methodology & Threshold Calculation
 
-After training, residuals on the **training set** are used to establish the anomaly threshold:
+Anomaly detection is performed by evaluating the prediction residual:
 
-```
-threshold = mean(|residual_train|) + 2 × std(|residual_train|)
-```
+$$\text{residual} = \text{actual\_energy} - \text{predicted\_energy}$$
+$$\text{absolute\_error} = |\text{residual}|$$
 
-This is statistically interpretable: observations whose absolute prediction error exceeds the typical training error by more than 2 standard deviations are flagged as anomalies.
+To prevent temporal leakage, the anomaly threshold is derived strictly from the **training set** ($N = 15,788$) residual distribution:
 
-### Severity Levels
+$$\text{threshold} = \text{mean}(|\text{residual}_{\text{train}}|) + 2 \times \text{std}(|\text{residual}_{\text{train}}|)$$
 
-| Severity | Condition |
-|----------|-----------|
-| Normal | `|residual| ≤ threshold` |
-| Moderate | `threshold < |residual| ≤ 1.5 × threshold` |
-| High | `|residual| > 1.5 × threshold` |
+From the training run on the UCI dataset:
+- $\text{mean}(|\text{residual}_{\text{train}}|) = 54.25\text{ Wh}$
+- $\text{std}(|\text{residual}_{\text{train}}|) = 78.51\text{ Wh}$
+- $\mathbf{\text{threshold} = 54.25 + 2 \times 78.51 = 211.27\text{ Wh}}$
+- Moderate/High boundary ($1.5 \times \text{threshold}$) = **316.90 Wh**
+
+### Severity Classification Table
+
+| Severity Level | Anomaly Flag | Code Condition | Threshold Bounds (Wh) | Test Set Count ($N=3,947$) | Description |
+|---|:---:|---|---|:---:|---|
+| **Normal** | `False` | `abs(residual) <= threshold` | `abs(residual) <= 211.27` | 3,807 (96.45%) | Consumption deviation is within typical expected variation ($2\sigma$) |
+| **Moderate** | `True` | `threshold < abs(residual) <= 1.5 * threshold` | `211.27 < abs(residual) <= 316.90` | 60 (1.52%) | Noticeable consumption deviation exceeding statistical expectation |
+| **High** | `True` | `abs(residual) > 1.5 * threshold` | `abs(residual) > 316.90` | 80 (2.03%) | Severe consumption deviation exceeding 1.5× the anomaly cutoff |
+
+**Summary of Anomaly Results:**
+- **Total Test Predictions:** 3,947
+- **Total Anomalies Detected:** 140 (3.55%)
+- **Moderate Anomalies:** 60 (1.52%)
+- **High Anomalies:** 80 (2.03%)
 
 ### ⚠️ Important Disclaimer
 
-An anomaly means the observed consumption is **unusually different from the model's expectation**. It does **NOT** automatically prove equipment failure, sensor malfunction, or any specific physical cause.
+An anomaly means the observed consumption is **unusually different from the statistical model expectation**. It does **NOT** prove equipment malfunction, physical appliance failure, or electrical fault.
 
 ---
 
 ## ✨ Gemini AI Integration
 
-Gemini is used **only** for natural-language explanation — not for prediction.
+EcoPulse AI uses Google Gemini **strictly for natural-language explanation and advisory recommendations** — never for numerical prediction.
 
-**Flow:**
+**Architecture Flow:**
 ```
-ML Prediction → Residual → Anomaly Detection → Structured Data → Gemini → Explanation
+ML Prediction (Linear Regression)
+       ↓
+Residual Calculation (Actual - Predicted)
+       ↓
+Statistical Anomaly Detection (Threshold: 211.27 Wh)
+       ↓
+Structured Context (Residual, Severity, Sensor Values, Time)
+       ↓
+Google Gemini 1.5 Flash (google-generativeai SDK)
+       ↓
+Natural-Language Explanation & Energy-Saving Recommendations
 ```
 
-Gemini receives:
-- Actual vs predicted consumption
-- Residual magnitude and severity
-- Time of observation (hour, day of week)
-- Environmental context (temperature, humidity, wind speed)
+### Implementation Details
 
-Gemini returns:
-- Short explanation of the deviation
-- Possible contributing factors (clearly framed as possibilities)
-- 2–4 practical energy-saving recommendations
-- Sustainability impact statement
+- **Model:** `gemini-1.5-flash` (via `genai.GenerativeModel("gemini-1.5-flash")` in `src/gemini_service.py`)
+- **Package:** `google-generativeai>=0.7.0` (configured in `requirements.txt`)
+- **Authentication:** Read via `GEMINI_API_KEY` environment variable (never committed)
+- **Graceful Fallback:** If `GEMINI_API_KEY` is missing or invalid, the application runs normally and returns an informative fallback message.
+
+### Structured Input to Gemini
+
+When an anomaly is flagged (`Moderate` or `High`), the system sends the following structured parameters:
+- **Consumption Data:** `actual_energy` (Wh), `predicted_energy` (Wh), `residual` (Wh), `severity` ("Moderate" / "High")
+- **Temporal Context:** `hour` (0–23), `day_of_week` (e.g., "Monday")
+- **Indoor Climate:** `T1` (Indoor temperature, °C), `RH_1` (Indoor humidity, %)
+- **Outdoor Meteorological:** `T_out` (°C), `RH_out` (%), `Windspeed` (m/s), `Visibility` (km), `Tdewpoint` (°C)
+- **Sub-metering:** `lights` (Lighting energy, Wh)
+
+### Gemini Output Structure
+
+Gemini is strictly prompted to return:
+1. **Short Explanation (2–3 sentences):** Contextual assessment of why consumption deviated from the model baseline.
+2. **Possible Contributing Factors (2–4 bullets):** Environmental or behavioural hypotheses based *strictly* on provided features, explicitly disclaiming physical diagnosis.
+3. **Energy-Saving Recommendations (2–4 bullets):** Concrete, actionable tips tailored to the time of day and environmental context.
+4. **Sustainability Impact (1 sentence):** Concise SDG-aligned impact statement.
 
 ---
 
@@ -277,7 +312,7 @@ By detecting and explaining energy anomalies, EcoPulse AI helps reduce unnecessa
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/ecopulse-ai.git
+git clone https://github.com/UtsavYadav1/ecopulse-ai.git
 cd ecopulse-ai
 ```
 
