@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoPulse AI — Prediction Result</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- ======== HEADER ======== -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <div>
+          <h1 class="brand-title">EcoPulse AI</h1>
+          <p class="brand-subtitle">Prediction Result</p>
+        </div>
+      </div>
+      <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+    </div>
+  </header>
+
+  <main class="container main-content">
+
+    <!-- ======== PREDICTION RESULT ======== -->
+    <section class="section">
+      <h2 class="section-title">⚡ Prediction Result</h2>
+      <div class="cards-grid">
+        <div class="card metric-card teal large-metric">
+          <div class="metric-icon">🔮</div>
+          <div class="metric-label">Predicted Energy Consumption</div>
+          <div class="metric-value huge">{{ prediction }} <span class="unit">Wh</span></div>
+          <div class="metric-desc">Appliances energy predicted by {{ "Random Forest" if "Random" in prediction|string else "ML model" }}</div>
+        </div>
+        {% if anomaly_info %}
+        <div class="card metric-card {{ 'red' if anomaly_info.is_anomaly else 'green' }} large-metric">
+          <div class="metric-icon">{{ '🚨' if anomaly_info.is_anomaly else '✅' }}</div>
+          <div class="metric-label">Anomaly Status</div>
+          <div class="metric-value huge">{{ anomaly_info.severity }}</div>
+          <div class="metric-desc">
+            Actual: {{ anomaly_info.actual_energy }} Wh &nbsp;|&nbsp;
+            Residual: {{ anomaly_info.residual }} Wh
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if anomaly_info %}
+    <!-- ======== ANOMALY DETAILS ======== -->
+    <section class="section">
+      <h2 class="section-title">🔍 Anomaly Analysis</h2>
+      <div class="card">
+        <div class="anomaly-detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Actual Energy</span>
+            <span class="detail-value">{{ anomaly_info.actual_energy }} Wh</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Predicted Energy</span>
+            <span class="detail-value">{{ anomaly_info.predicted_energy }} Wh</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Residual</span>
+            <span class="detail-value {{ 'positive' if anomaly_info.residual > 0 else 'negative' }}">
+              {{ anomaly_info.residual }} Wh
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Absolute Error</span>
+            <span class="detail-value">{{ anomaly_info.absolute_error }} Wh</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Anomaly Threshold</span>
+            <span class="detail-value">{{ anomaly_info.threshold }} Wh</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Severity</span>
+            <span class="severity-badge severity-{{ anomaly_info.severity | lower }}">{{ anomaly_info.severity }}</span>
+          </div>
+        </div>
+
+        {% if anomaly_info.is_anomaly %}
+        <div class="anomaly-note">
+          <strong>ℹ️ What does this mean?</strong>
+          The model expected <strong>{{ anomaly_info.predicted_energy }} Wh</strong> but observed
+          <strong>{{ anomaly_info.actual_energy }} Wh</strong> — a difference of
+          <strong>{{ anomaly_info.absolute_error }} Wh</strong>, which exceeds the statistical
+          threshold of <strong>{{ anomaly_info.threshold }} Wh</strong>.
+          This is a <em>possible signal</em> of unusual consumption, not a guaranteed equipment fault.
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- ======== GEMINI AI EXPLANATION ======== -->
+    {% if anomaly_info.is_anomaly %}
+    <section class="section">
+      <h2 class="section-title">🤖 AI-Powered Energy Explanation</h2>
+      <div class="card gemini-card">
+        <div class="gemini-header">
+          <span class="gemini-icon">✨</span>
+          <span>Powered by Google Gemini — <em>advisory only, not a physical diagnosis</em></span>
+        </div>
+        <div id="gemini-loading" class="gemini-loading">
+          <div class="spinner"></div>
+          <p>Generating energy explanation and recommendations…</p>
+        </div>
+        <div id="gemini-explanation" class="gemini-body" style="display:none;"></div>
+        <div id="gemini-error" class="gemini-error" style="display:none;"></div>
+      </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    <!-- ======== INPUT SUMMARY ======== -->
+    <section class="section">
+      <h2 class="section-title">📋 Input Parameters Used</h2>
+      <div class="card">
+        <div class="input-summary-grid">
+          {% for key, val in form_data.items() %}
+          {% if val and key != 'actual_energy' %}
+          <div class="input-item">
+            <span class="input-key">{{ key }}</span>
+            <span class="input-val">{{ val }}</span>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <div class="action-row">
+      <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+      <a href="/predict" class="btn btn-primary">🔮 New Prediction</a>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>⚡ EcoPulse AI &mdash; Powering sustainability through machine intelligence</p>
+    </div>
+  </footer>
+
+  <script>
+    // Anomaly context passed to JS for Gemini API call
+    const anomalyInfo = {{ anomaly_info | tojson if anomaly_info else 'null' }};
+
+    if (anomalyInfo && anomalyInfo.is_anomaly) {
+      // Fetch Gemini explanation
+      fetch('/explain', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(anomalyInfo)
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('gemini-loading').style.display = 'none';
+        const explDiv = document.getElementById('gemini-explanation');
+        explDiv.style.display = 'block';
+        // Convert newlines to paragraphs and bold headers
+        let html = data.explanation
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .split('\n')
+          .map(line => line.trim() ? `<p>${line}</p>` : '')
+          .join('');
+        explDiv.innerHTML = html;
+      })
+      .catch(err => {
+        document.getElementById('gemini-loading').style.display = 'none';
+        const errDiv = document.getElementById('gemini-error');
+        errDiv.style.display = 'block';
+        errDiv.textContent = '⚠️ Could not reach the Gemini API. Check your API key and network connection.';
+      });
+    }
+  </script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

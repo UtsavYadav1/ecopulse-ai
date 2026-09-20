@@ -1,0 +1,27 @@
+{
+  "model_comparison": {
+    "Linear Regression": {
+      "MAE": 49.8784,
+      "RMSE": 85.9255,
+      "R2": 0.1092
+    },
+    "Random Forest": {
+      "MAE": 130.6959,
+      "RMSE": 166.1334,
+      "R2": -2.3301
+    }
+  },
+  "best_model": "Linear Regression",
+  "best_model_metrics": {
+    "MAE": 49.8784,
+    "RMSE": 85.9255,
+    "R2": 0.1092
+  },
+  "anomaly_summary": {
+    "total_predictions": 3947,
+    "anomaly_count": 140,
+    "anomaly_rate_pct": 3.55,
+    "moderate_count": 60,
+    "high_count": 80
+  }
+}

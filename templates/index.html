@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoPulse AI — Energy Intelligence Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- ======== HEADER ======== -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <div>
+          <h1 class="brand-title">EcoPulse AI</h1>
+          <p class="brand-subtitle">AI-Based Energy Consumption Prediction &amp; Anomaly Detection</p>
+        </div>
+      </div>
+      <div class="sdg-badges">
+        <span class="sdg-badge sdg7">🌞 SDG 7<br/><small>Clean Energy</small></span>
+        <span class="sdg-badge sdg13">🌍 SDG 13<br/><small>Climate Action</small></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======== HERO BANNER ======== -->
+  <section class="hero">
+    <div class="container">
+      <p class="hero-text">
+        Harnessing machine learning to predict appliance energy consumption and detect anomalies in real-time —
+        empowering sustainable energy decisions for a greener future.
+      </p>
+    </div>
+  </section>
+
+  <main class="container main-content">
+
+    {% if not trained %}
+    <!-- ======== NOT TRAINED WARNING ======== -->
+    <div class="alert alert-warning">
+      <strong>⚠️ Model Not Trained Yet</strong>
+      <p>Run the training pipeline first to generate the model and visualizations:</p>
+      <code>python src/train.py</code>
+    </div>
+    {% endif %}
+
+    {% if trained %}
+    <!-- ======== METRICS OVERVIEW ======== -->
+    <section class="section">
+      <h2 class="section-title">📊 Model Performance</h2>
+      <div class="cards-grid">
+        <div class="card metric-card">
+          <div class="metric-icon">🏆</div>
+          <div class="metric-label">Final Model</div>
+          <div class="metric-value model-name">{{ metrics.best_model }}</div>
+        </div>
+        <div class="card metric-card green">
+          <div class="metric-icon">📉</div>
+          <div class="metric-label">MAE (Wh)</div>
+          <div class="metric-value">{{ metrics.best_model_metrics.MAE }}</div>
+          <div class="metric-desc">Mean Absolute Error</div>
+        </div>
+        <div class="card metric-card blue">
+          <div class="metric-icon">📐</div>
+          <div class="metric-label">RMSE (Wh)</div>
+          <div class="metric-value">{{ metrics.best_model_metrics.RMSE }}</div>
+          <div class="metric-desc">Root Mean Squared Error</div>
+        </div>
+        <div class="card metric-card teal">
+          <div class="metric-icon">🎯</div>
+          <div class="metric-label">R² Score</div>
+          <div class="metric-value">{{ metrics.best_model_metrics.R2 }}</div>
+          <div class="metric-desc">Variance Explained</div>
+        </div>
+        <div class="card metric-card orange">
+          <div class="metric-icon">🚨</div>
+          <div class="metric-label">Anomalies</div>
+          <div class="metric-value">{{ metrics.anomaly_summary.anomaly_count }}</div>
+          <div class="metric-desc">of {{ metrics.anomaly_summary.total_predictions }} test predictions</div>
+        </div>
+        <div class="card metric-card red">
+          <div class="metric-icon">🔴</div>
+          <div class="metric-label">High Severity</div>
+          <div class="metric-value">{{ metrics.anomaly_summary.high_count }}</div>
+          <div class="metric-desc">Critical anomalies detected</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== MODEL COMPARISON TABLE ======== -->
+    <section class="section">
+      <h2 class="section-title">⚖️ Model Comparison</h2>
+      <div class="card">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>MAE (Wh)</th>
+              <th>RMSE (Wh)</th>
+              <th>R²</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for model_name, model_metrics in metrics.model_comparison.items() %}
+            <tr class="{{ 'best-row' if model_name == metrics.best_model else '' }}">
+              <td><strong>{{ model_name }}</strong></td>
+              <td>{{ model_metrics.MAE }}</td>
+              <td>{{ model_metrics.RMSE }}</td>
+              <td>{{ model_metrics.R2 }}</td>
+              <td>
+                {% if model_name == metrics.best_model %}
+                  <span class="badge badge-success">✅ Selected</span>
+                {% else %}
+                  <span class="badge badge-neutral">Baseline</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="table-note">
+          ℹ️ Selection criterion: lowest RMSE on chronologically held-out test set (last 20% of data).
+          RMSE penalises large errors more than MAE, which is critical for anomaly detection.
+        </p>
+      </div>
+    </section>
+
+    <!-- ======== VISUALIZATIONS ======== -->
+    <section class="section">
+      <h2 class="section-title">📈 Visualizations</h2>
+      <div class="plots-grid">
+        <div class="card plot-card">
+          <h3>Energy Consumption Trend</h3>
+          <img src="{{ url_for('static', filename='plots/energy_trend.png') }}" alt="Energy Trend" />
+        </div>
+        <div class="card plot-card">
+          <h3>Actual vs Predicted (Line)</h3>
+          <img src="{{ url_for('static', filename='plots/actual_vs_predicted_line.png') }}" alt="Actual vs Predicted" />
+        </div>
+        <div class="card plot-card">
+          <h3>Anomaly Visualization</h3>
+          <img src="{{ url_for('static', filename='plots/anomalies.png') }}" alt="Anomalies" />
+        </div>
+        <div class="card plot-card half">
+          <h3>Actual vs Predicted (Scatter)</h3>
+          <img src="{{ url_for('static', filename='plots/actual_vs_predicted_scatter.png') }}" alt="Scatter" />
+        </div>
+        <div class="card plot-card half">
+          <h3>Model Comparison</h3>
+          <img src="{{ url_for('static', filename='plots/model_comparison.png') }}" alt="Model Comparison" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== RECENT ANOMALIES ======== -->
+    {% if anomalies %}
+    <section class="section">
+      <h2 class="section-title">🚨 Top Anomalies Detected</h2>
+      <div class="card">
+        <div class="anomalies-scroll">
+          <table class="anomaly-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Actual (Wh)</th>
+                <th>Predicted (Wh)</th>
+                <th>Residual (Wh)</th>
+                <th>Abs Error</th>
+                <th>Severity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in anomalies %}
+              <tr>
+                <td>{{ a.date }}</td>
+                <td>{{ a.actual_energy }}</td>
+                <td>{{ a.predicted_energy }}</td>
+                <td>{{ a.residual }}</td>
+                <td>{{ a.absolute_error }}</td>
+                <td>
+                  <span class="severity-badge severity-{{ a.severity | lower }}">{{ a.severity }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if threshold %}
+        <p class="table-note">
+          Anomaly threshold: <strong>{{ "%.2f"|format(threshold.threshold) }} Wh</strong>
+          = mean(|residual|) + 2×std(|residual|)
+          = {{ "%.2f"|format(threshold.mean_abs_residual) }} + 2×{{ "%.2f"|format(threshold.std_abs_residual) }}
+        </p>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    <!-- ======== PREDICTION FORM ======== -->
+    <section class="section">
+      <h2 class="section-title">🔮 Predict Energy Consumption</h2>
+      <div class="card">
+        <p class="form-intro">
+          Enter environmental and time parameters to predict appliance energy consumption.
+          Optionally provide the actual observed energy to check for anomalies.
+        </p>
+        <form method="POST" action="/predict" class="predict-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="date_input">Date &amp; Time</label>
+              <input type="datetime-local" id="date_input" name="date_input" value="2016-02-15T12:00" />
+              <small>Used to derive hour, day, weekday, season features</small>
+            </div>
+            <div class="form-group">
+              <label for="T1">Indoor Temperature (T1) °C</label>
+              <input type="number" step="0.1" id="T1" name="T1" value="19.89" />
+            </div>
+            <div class="form-group">
+              <label for="T_out">Outdoor Temperature (T_out) °C</label>
+              <input type="number" step="0.1" id="T_out" name="T_out" value="6.60" />
+            </div>
+            <div class="form-group">
+              <label for="RH_1">Indoor Humidity (RH_1) %</label>
+              <input type="number" step="0.1" id="RH_1" name="RH_1" value="47.59" />
+            </div>
+            <div class="form-group">
+              <label for="RH_out">Outdoor Humidity (RH_out) %</label>
+              <input type="number" step="0.1" id="RH_out" name="RH_out" value="92.0" />
+            </div>
+            <div class="form-group">
+              <label for="Windspeed">Wind Speed (m/s)</label>
+              <input type="number" step="0.1" id="Windspeed" name="Windspeed" value="7.0" />
+            </div>
+            <div class="form-group">
+              <label for="Visibility">Visibility (km)</label>
+              <input type="number" step="0.1" id="Visibility" name="Visibility" value="63.0" />
+            </div>
+            <div class="form-group">
+              <label for="Tdewpoint">Dew Point Temp °C</label>
+              <input type="number" step="0.1" id="Tdewpoint" name="Tdewpoint" value="5.3" />
+            </div>
+            <div class="form-group">
+              <label for="lights">Lights Energy (Wh)</label>
+              <input type="number" step="0.1" id="lights" name="lights" value="0" />
+            </div>
+            <div class="form-group">
+              <label for="actual_energy">Actual Energy (Wh) — optional</label>
+              <input type="number" step="0.1" id="actual_energy" name="actual_energy" placeholder="Enter to enable anomaly check" />
+              <small>If provided, anomaly detection will be performed</small>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">⚡ Predict Energy Consumption</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ======== RESPONSIBLE AI ======== -->
+    <section class="section">
+      <h2 class="section-title">🛡️ Responsible AI</h2>
+      <div class="cards-grid rai-grid">
+        <div class="card rai-card">
+          <div class="rai-icon">🔍</div>
+          <h3>Transparency</h3>
+          <p>All model metrics (MAE, RMSE, R²) are computed on real held-out data and displayed here. No results are fabricated.</p>
+        </div>
+        <div class="card rai-card">
+          <div class="rai-icon">👤</div>
+          <h3>Human Oversight</h3>
+          <p>AI recommendations are advisory only. All energy decisions must be reviewed and validated by qualified humans.</p>
+        </div>
+        <div class="card rai-card">
+          <div class="rai-icon">🔒</div>
+          <h3>Privacy</h3>
+          <p>No personally identifiable information is required or collected. The dataset contains only environmental sensor readings.</p>
+        </div>
+        <div class="card rai-card">
+          <div class="rai-icon">⚠️</div>
+          <h3>Limitations</h3>
+          <p>This model was trained on a specific low-energy house in Belgium (Jan–May 2016). Performance on other buildings/climates may differ.</p>
+        </div>
+        <div class="card rai-card">
+          <div class="rai-icon">🤖</div>
+          <h3>Gemini Explanations</h3>
+          <p>AI explanations are possible interpretations based on supplied data, not verified physical diagnoses of equipment issues.</p>
+        </div>
+        <div class="card rai-card">
+          <div class="rai-icon">🌱</div>
+          <h3>SDG Alignment</h3>
+          <p>EcoPulse AI directly supports SDG 7 (Affordable and Clean Energy) and SDG 13 (Climate Action) through energy intelligence.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======== FOOTER ======== -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>⚡ EcoPulse AI &mdash; Powering sustainability through machine intelligence</p>
+      <p class="footer-small">
+        Dataset: <a href="https://archive.ics.uci.edu/dataset/374/appliances+energy+prediction" target="_blank">UCI Appliances Energy Prediction</a>
+        &nbsp;|&nbsp; Built with Python, Scikit-learn, Flask &amp; Gemini AI
+      </p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
